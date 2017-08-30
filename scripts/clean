@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+IFS=$'\n\t'
+
+function packageName() {
+  echo $(echo $1 | sed 's/\.\/packages\///')
+}
+
+rm -rf node_modules
+
+for packageDir in `find ./packages/* -type d -maxdepth 0`; do
+  package=$(packageName $packageDir)
+  cd $packageDir
+  rm -rf node_modules dist
+  cd ../..
+done

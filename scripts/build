@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+IFS=$'\n\t'
+
+NODE_ENV=production
+
+function packageName() {
+  echo $(echo $1 | sed 's/\.\/packages\///')
+}
+
+for packageDir in `find ./packages/* -type d -maxdepth 0`; do
+  package=$(packageName $packageDir)
+  cd $packageDir
+  yarn build
+  cd ../..
+done

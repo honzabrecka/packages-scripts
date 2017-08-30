@@ -1,0 +1,65 @@
+#!/usr/bin/env node
+
+const fs = require('fs');
+const path = require('path');
+
+function exit(package, message) {
+  console.error(`Error in package '${package}': ${message}`);
+  process.exit(1);
+}
+
+const packagesDir = './packages';
+const packageTemplate = 'package-template';
+const packageTemplateConfig = require(`../${packagesDir}/${packageTemplate}/package.json`);
+
+function checkDependencies(package, [expected, expectedProp], [actual, actualProp]) {
+  const expectedCursor = expected[expectedProp];
+  const actualCursor = actual[actualProp];
+
+  Object.keys(expectedCursor).forEach((dep) => {
+    if (actualCursor === undefined)
+      exit(package, `${actualProp} is missing.`);
+   if (actualCursor[dep] === undefined)
+      exit(package, `Dependency ${dep} is not included in ${actualProp}.`);
+    if (actualCursor[dep] !== expectedCursor[dep])
+      exit(package, `Versions of ${dep} dependency mismatch. Expected ${expectedCursor[dep]}, but was ${actualCursor[dep]}.`);
+  });
+}
+
+function checkProperty(package, expected, actual, prop) {
+  if ((typeof expected[prop] === 'string' || Array.isArray(expected[prop]))
+    && JSON.stringify(expected[prop]) !== JSON.stringify(actual[prop])) {
+    exit(package, `Property ${prop} mismatch. Check ${packagesDir}/${packageTemplate}/package.json.`);
+  } else {
+    Object.keys(expected[prop]).reduce((r, k) => r && JSON.stringify(expected[prop][k]) === JSON.stringify(actual[prop][k]), true)
+      || exit(package, `Property ${prop} mismatch. Check ${packagesDir}/${packageTemplate}/package.json.`);;
+  }
+}
+
+fs.readdirSync(packagesDir)
+  .filter((file) => fs.statSync(path.join(packagesDir, file)).isDirectory())
+  .forEach((file) => {
+    const packageConfig = require(`../${packagesDir}/${file}/package.json`);
+
+    checkDependencies(
+      file,
+      [packageTemplateConfig, 'devDependencies'],
+      [packageConfig, 'devDependencies']
+    );
+
+    checkDependencies(
+      file,
+      [packageTemplateConfig, 'peerDependencies'],
+      [packageConfig, 'peerDependencies']
+    );
+
+    checkDependencies(
+      file,
+      [packageConfig, 'peerDependencies'],
+      [packageConfig, 'dependencies']
+    );
+
+    ['publishConfig', 'main', 'typings', 'jest'].forEach((prop) => {
+      checkProperty(file, packageTemplateConfig, packageConfig, prop);
+    });
+  });

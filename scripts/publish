@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+
+set -uo pipefail
+IFS=$'\n\t'
+
+if ! [ "$BITBUCKET_BRANCH" = "master" ]; then
+  echo "Skipping 'publish' step, because not running on 'master' branch."
+  exit 0
+fi
+
+function packageName() {
+  echo $(echo $1 | sed 's/\.\/packages\///')
+}
+
+function packageJsonVersion() {
+  echo $(grep -m1 version "$1/package.json" | awk -F: '{ print $2 }' | sed 's/[", ]//g')
+}
+
+for packageDir in `find ./packages/* -type d -maxdepth 0`; do
+  tempLog=$(mktemp)
+  package=$(packageName $packageDir)
+  packageVersion=$(packageJsonVersion $packageDir)
+
+  if [ "$package" = "package-template" ]; then
+    continue
+  fi
+
+  cd $packageDir
+  npm publish > ${tempLog} 2>&1
+
+  # was it successful?
+  if [ $? -eq 0 ]; then
+    echo ">> Package '$package@$packageVersion' has been successfully published!"
+  else
+    # npm publish action is idempotent
+    grep -q "npm ERR! code E403" ${tempLog}
+    grepStatus=$?
+
+    if [ $grepStatus -eq 0 ]; then
+      echo "Package '$package@$packageVersion' is already published."
+    else
+      cat ${tempLog}
+    fi
+
+    rm -f ${tempLog}
+  fi
+
+  rm -f ${tempLog}
+  cd ../..
+done

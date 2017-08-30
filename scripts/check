@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+IFS=$'\n\t'
+
+function packageName() {
+  echo $(echo $1 | sed 's/\.\/packages\///')
+}
+
+function packageJsonName() {
+  echo $(grep -m1 name "$1/package.json" | awk -F: '{ print $2 }' | sed 's/[", ]//g')
+}
+
+declare -a requiredFiles=(
+  "package.json" "README.md" "tsconfig.json" "yarn.lock" ".npmignore"
+  "dist/src/index.d.ts" "dist/src/index.js"
+)
+
+for packageDir in `find ./packages/* -type d -maxdepth 0`; do
+  a=$(packageName $packageDir)
+  b=$(packageJsonName $packageDir)
+  if ! [ "$a" = "$b" ]; then
+    echo "Package '$a' has wrong name in package.json, expected '$a', but is '$b'."
+    exit 1
+  fi
+
+  if ! grep -q "^# $a$" "$packageDir/README.md"; then
+    echo "README of '$a' does not contain the package name at the first line."
+    exit 1
+  fi
+
+  if ! [ -f "$packageDir/src/index.ts" ] && ! [ -f "$packageDir/src/index.tsx" ]; then
+    echo "Package '$a' does not contain required file src/index.tsx?."
+    exit 1
+  fi
+
+  for requiredFile in "${requiredFiles[@]}"; do
+    if ! [ -f "$packageDir/$requiredFile" ]; then
+      echo "Package '$a' does not contain required file $requiredFile ."
+      exit 1
+    fi
+  done
+done
