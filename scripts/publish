@@ -40,6 +40,7 @@ for packageDir in `find ./packages/* -type d -maxdepth 0`; do
       echo "Package '$package@$packageVersion' is already published."
     else
       cat ${tempLog}
+      exit 1
     fi
 
     rm -f ${tempLog}
